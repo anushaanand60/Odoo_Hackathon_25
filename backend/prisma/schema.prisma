@@ -16,9 +16,18 @@ model User {
   profilePhoto  String?
   availability  String?        // e.g., "weekends,evenings"
   isPublic      Boolean        @default(true)
+  role          UserRole       @default(USER)
+  isActive      Boolean        @default(true)
+  lastLoginAt   DateTime?
+  bannedAt      DateTime?
+  bannedReason  String?
   skills        Skill[]
   sentRequests  SwapRequest[]  @relation("SentRequests")
   receivedRequests SwapRequest[] @relation("ReceivedRequests")
+  createdReports Report[]       @relation("ReportCreator")
+  reportedBy    Report[]       @relation("ReportedUser")
+  givenRatings  Rating[]       @relation("RatingGiver")
+  receivedRatings Rating[]     @relation("RatingReceiver")
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }
@@ -29,6 +38,10 @@ model Skill {
   type          SkillType // "OFFERED" or "WANTED"
   userId        String
   user          User      @relation(fields: [userId], references: [id])
+  isApproved    Boolean   @default(true)
+  isFlagged     Boolean   @default(false)
+  flagReason    String?
+  reports       Report[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -37,11 +50,109 @@ model SwapRequest {
   id            String   @id @default(uuid())
   senderId      String
   receiverId    String
+  message       String?  // Optional message when creating request
   status        RequestStatus @default(PENDING)
   sender        User     @relation("SentRequests", fields: [senderId], references: [id])
   receiver      User     @relation("ReceivedRequests", fields: [receiverId], references: [id])
+  ratings       Rating[] // Ratings for this swap request
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+model Report {
+  id            String      @id @default(uuid())
+  reporterId    String
+  reportedUserId String?
+  reportedSkillId String?
+  type          ReportType
+  reason        String
+  description   String?
+  status        ReportStatus @default(PENDING)
+  reviewedAt    DateTime?
+  reviewedBy    String?
+  resolution    String?
+  reporter      User        @relation("ReportCreator", fields: [reporterId], references: [id])
+  reportedUser  User?       @relation("ReportedUser", fields: [reportedUserId], references: [id])
+  reportedSkill Skill?      @relation(fields: [reportedSkillId], references: [id])
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model PlatformMessage {
+  id          String      @id @default(uuid())
+  title       String
+  content     String
+  type        MessageType @default(ANNOUNCEMENT)
+  isActive    Boolean     @default(true)
+  priority    MessagePriority @default(NORMAL)
+  targetRole  UserRole?   // null means all users
+  expiresAt   DateTime?
+  createdBy   String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model Rating {
+  id              String      @id @default(uuid())
+  swapRequestId   String
+  raterId         String      // User who gives the rating
+  ratedUserId     String      // User who receives the rating
+  rating          Int         // 1-5 star rating
+  feedback        String?     // Optional written feedback
+  isPublic        Boolean     @default(true) // Whether rating is visible to others
+  swapRequest     SwapRequest @relation(fields: [swapRequestId], references: [id])
+  rater           User        @relation("RatingGiver", fields: [raterId], references: [id])
+  ratedUser       User        @relation("RatingReceiver", fields: [ratedUserId], references: [id])
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([swapRequestId, raterId]) // Each user can only rate once per swap
+}
+
+model AdminLog {
+  id          String    @id @default(uuid())
+  adminId     String
+  action      String
+  targetType  String?   // "user", "skill", "report", etc.
+  targetId    String?
+  details     String?
+  ipAddress   String?
+  createdAt   DateTime  @default(now())
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum ReportType {
+  INAPPROPRIATE_SKILL
+  SPAM_CONTENT
+  HARASSMENT
+  FAKE_PROFILE
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  DISMISSED
+}
+
+enum MessageType {
+  ANNOUNCEMENT
+  UPDATE
+  WARNING
+  MAINTENANCE
+}
+
+enum MessagePriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
 }
 
 enum SkillType {

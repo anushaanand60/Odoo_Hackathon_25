@@ -1,0 +1,223 @@
+const express = require('express');
+const { PrismaClient } = require('@prisma/client');
+const z = require('zod');
+const authenticate = require('../utils/authmiddleware');
+
+const router = express.Router();
+const prisma = new PrismaClient();
+
+// Search users by skill name
+router.get('/users', authenticate, async (req, res) => {
+    try {
+        const { skill, page = 1, limit = 20 } = req.query;
+        const offset = (page - 1) * limit;
+
+        // Get users who have accepted swap requests with current user
+        const acceptedSwapUsers = await prisma.swapRequest.findMany({
+            where: {
+                OR: [
+                    { senderId: req.userId, status: 'ACCEPTED' },
+                    { receiverId: req.userId, status: 'ACCEPTED' }
+                ]
+            },
+            select: {
+                senderId: true,
+                receiverId: true
+            }
+        });
+
+        // Extract user IDs to exclude (users with accepted swaps)
+        const excludedUserIds = new Set();
+        acceptedSwapUsers.forEach(request => {
+            if (request.senderId !== req.userId) {
+                excludedUserIds.add(request.senderId);
+            }
+            if (request.receiverId !== req.userId) {
+                excludedUserIds.add(request.receiverId);
+            }
+        });
+
+        let whereClause = {
+            isPublic: true,
+            NOT: {
+                id: {
+                    in: [req.userId, ...Array.from(excludedUserIds)] // Exclude current user and users with accepted swaps
+                }
+            }
+        };
+
+        // If skill is provided, filter by skill name
+        if (skill) {
+            whereClause.skills = {
+                some: {
+                    name: {
+                        contains: skill,
+                        mode: 'insensitive'
+                    }
+                }
+            };
+        }
+
+        const users = await prisma.user.findMany({
+            where: whereClause,
+            select: {
+                id: true,
+                name: true,
+                location: true,
+                profilePhoto: true,
+                availability: true,
+                skills: {
+                    select: {
+                        id: true,
+                        name: true,
+                        type: true
+                    }
+                },
+                createdAt: true
+            },
+            skip: offset,
+            take: parseInt(limit),
+            orderBy: {
+                createdAt: 'desc'
+            }
+        });
+
+        // Get total count for pagination
+        const totalUsers = await prisma.user.count({
+            where: whereClause
+        });
+
+        res.json({
+            users,
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total: totalUsers,
+                totalPages: Math.ceil(totalUsers / limit)
+            }
+        });
+    } catch (error) {
+        console.error('Search users error:', error);
+        res.status(500).json({ error: 'Failed to search users' });
+    }
+});
+
+// Get user profile by ID
+router.get('/users/:id', authenticate, async (req, res) => {
+    try {
+        const user = await prisma.user.findUnique({
+            where: {
+                id: req.params.id,
+                isPublic: true
+            },
+            select: {
+                id: true,
+                name: true,
+                location: true,
+                profilePhoto: true,
+                availability: true,
+                skills: {
+                    select: {
+                        id: true,
+                        name: true,
+                        type: true
+                    }
+                },
+                createdAt: true
+            }
+        });
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found or profile is private' });
+        }
+
+        // Check if current user has already sent a swap request to this user or has an accepted swap
+        const existingRequest = await prisma.swapRequest.findFirst({
+            where: {
+                OR: [
+                    { senderId: req.userId, receiverId: req.params.id },
+                    { senderId: req.params.id, receiverId: req.userId }
+                ],
+                status: {
+                    in: ['PENDING', 'ACCEPTED']
+                }
+            }
+        });
+
+        res.json({
+            ...user,
+            hasExistingRequest: !!existingRequest,
+            requestStatus: existingRequest?.status || null
+        });
+    } catch (error) {
+        console.error('Get user profile error:', error);
+        res.status(500).json({ error: 'Failed to fetch user profile' });
+    }
+});
+
+// Get all unique skills for filtering
+router.get('/skills', authenticate, async (req, res) => {
+    try {
+        const skills = await prisma.skill.findMany({
+            where: {
+                user: {
+                    isPublic: true
+                }
+            },
+            select: {
+                name: true,
+                type: true
+            },
+            distinct: ['name']
+        });
+
+        // Group skills by type
+        const skillsByType = skills.reduce((acc, skill) => {
+            if (!acc[skill.type]) {
+                acc[skill.type] = [];
+            }
+            if (!acc[skill.type].includes(skill.name)) {
+                acc[skill.type].push(skill.name);
+            }
+            return acc;
+        }, {});
+
+        res.json(skillsByType);
+    } catch (error) {
+        console.error('Get skills error:', error);
+        res.status(500).json({ error: 'Failed to fetch skills' });
+    }
+});
+
+// Get trending skills (most popular)
+router.get('/trending-skills', authenticate, async (req, res) => {
+    try {
+        const trendingSkills = await prisma.skill.groupBy({
+            by: ['name'],
+            where: {
+                user: {
+                    isPublic: true
+                }
+            },
+            _count: {
+                name: true
+            },
+            orderBy: {
+                _count: {
+                    name: 'desc'
+                }
+            },
+            take: 10
+        });
+
+        res.json(trendingSkills.map(skill => ({
+            name: skill.name,
+            count: skill._count.name
+        })));
+    } catch (error) {
+        console.error('Get trending skills error:', error);
+        res.status(500).json({ error: 'Failed to fetch trending skills' });
+    }
+});
+
+module.exports = router;
