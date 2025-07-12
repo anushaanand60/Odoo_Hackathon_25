@@ -220,4 +220,57 @@ router.get('/trending-skills', authenticate, async (req, res) => {
     }
 });
 
+// Get top 5 users by points
+router.get('/top-points', authenticate, async (req, res) => {
+  try {
+    const top = await prisma.user.findMany({
+      where: { isPublic: true },
+      orderBy: { points: 'desc' },
+      take: 5,
+      select: {
+        id: true,
+        name: true,
+        profilePhoto: true,
+        points: true
+      }
+    });
+    res.json(top);
+  } catch (error) {
+    console.error('Get top points error:', error);
+    res.status(500).json({ error: 'Failed to fetch top users by points' });
+  }
+});
+
+// Get top 5 users by average rating
+router.get('/top-ratings', authenticate, async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      where: { isPublic: true },
+      select: {
+        id: true,
+        name: true,
+        profilePhoto: true,
+        receivedRatings: {
+          select: { rating: true }
+        }
+      }
+    });
+    const top = users
+      .map(u => ({
+        id: u.id,
+        name: u.name,
+        profilePhoto: u.profilePhoto,
+        averageRating: u.receivedRatings.length > 0 ? 
+          u.receivedRatings.reduce((sum, r) => sum + r.rating, 0) / u.receivedRatings.length : 0,
+        totalRatings: u.receivedRatings.length
+      }))
+      .sort((a, b) => b.averageRating - a.averageRating || b.totalRatings - a.totalRatings)
+      .slice(0, 5);
+    res.json(top);
+  } catch (error) {
+    console.error('Get top ratings error:', error);
+    res.status(500).json({ error: 'Failed to fetch top users by ratings' });
+  }
+});
+
 module.exports = router;

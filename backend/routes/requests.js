@@ -328,6 +328,17 @@ router.put('/:id/respond', authenticate, async (req, res) => {
             }
         });
 
+        if (status === 'ACCEPTED') {
+            await prisma.user.update({
+                where: { id: updatedRequest.senderId },
+                data: { points: { increment: 1 } }
+            });
+            await prisma.user.update({
+                where: { id: updatedRequest.receiverId },
+                data: { points: { increment: 1 } }
+            });
+        }
+
         res.json({
             message: `Swap request ${status.toLowerCase()} successfully`,
             request: updatedRequest
