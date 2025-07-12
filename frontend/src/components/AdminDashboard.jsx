@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import {
     BarChart3,
     Users,
+    User,
     Shield,
     Flag,
     MessageSquare,
@@ -28,7 +29,8 @@ import {
     Plus,
     MapPin,
     Star,
-    MessageCircle
+    MessageCircle,
+    X
 } from 'lucide-react';
 import adminApi from '../services/adminApi';
 import { MainContent } from './Layout';
@@ -406,10 +408,13 @@ const UsersTab = ({ setError, setSuccess }) => {
             if (statusFilter !== 'all') params.status = statusFilter;
             if (roleFilter !== 'all') params.role = roleFilter;
 
+            console.log('Fetching users with params:', params);
             const response = await adminApi.getUsers(params, token);
-            setUsers(response.data.users);
+            console.log('Users response:', response.data);
+            setUsers(response.data.users || []);
         } catch (err) {
-            setError('Failed to fetch users');
+            console.error('Error fetching users:', err);
+            setError(err.response?.data?.error || 'Failed to fetch users');
         } finally {
             setLoading(false);
         }

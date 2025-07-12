@@ -93,6 +93,7 @@ router.get('/dashboard', requireAdmin, async (req, res) => {
 // Get all users with pagination and filters
 router.get('/users', requireAdmin, async (req, res) => {
     try {
+        console.log('Admin users route hit with query:', req.query);
         const {
             page = 1,
             limit = 20,
@@ -130,6 +131,8 @@ router.get('/users', requireAdmin, async (req, res) => {
             whereClause.isActive = false;
         }
 
+        console.log('Where clause:', whereClause);
+
         const [users, totalUsers] = await Promise.all([
             prisma.user.findMany({
                 where: whereClause,
@@ -137,6 +140,8 @@ router.get('/users', requireAdmin, async (req, res) => {
                     id: true,
                     email: true,
                     name: true,
+                    profilePhoto: true,
+                    location: true,
                     role: true,
                     isActive: true,
                     bannedAt: true,
@@ -159,6 +164,8 @@ router.get('/users', requireAdmin, async (req, res) => {
             }),
             prisma.user.count({ where: whereClause })
         ]);
+
+        console.log(`Found ${users.length} users out of ${totalUsers} total`);
 
         res.json({
             users,
