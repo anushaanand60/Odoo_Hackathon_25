@@ -2,9 +2,9 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Star, MessageCircle, User } from 'lucide-react';
 
-const RatingDisplay = ({ 
-    averageRating = 0, 
-    totalRatings = 0, 
+const RatingDisplay = ({
+    averageRating = 0,
+    totalRatings = 0,
     showDetails = false,
     size = 'normal', // 'small', 'normal', 'large'
     className = ''
@@ -44,11 +44,10 @@ const RatingDisplay = ({
                 {[1, 2, 3, 4, 5].map((star) => (
                     <Star
                         key={star}
-                        className={`${sizeClasses.star} transition-all duration-200 ${
-                            star <= Math.round(rating)
+                        className={`${sizeClasses.star} transition-all duration-200 ${star <= Math.round(rating)
                                 ? 'text-yellow-400 fill-yellow-400'
                                 : 'text-gray-400'
-                        }`}
+                            }`}
                     />
                 ))}
             </div>
@@ -96,7 +95,7 @@ export const RatingCard = ({ rating, showRater = true }) => {
                         <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500/20 to-cyan-500/20 border border-gray-600/30 flex items-center justify-center overflow-hidden">
                             {rating.rater.profilePhoto ? (
                                 <img
-                                    src={rating.rater.profilePhoto.startsWith('http') ? rating.rater.profilePhoto : `http://localhost:8000${rating.rater.profilePhoto}`}
+                                    src={rating.rater.profilePhoto}
                                     alt={rating.rater.name}
                                     className="w-full h-full object-cover"
                                 />
@@ -112,9 +111,9 @@ export const RatingCard = ({ rating, showRater = true }) => {
                         </div>
                     </div>
                 )}
-                <RatingDisplay 
-                    averageRating={rating.rating} 
-                    totalRatings={1} 
+                <RatingDisplay
+                    averageRating={rating.rating}
+                    totalRatings={1}
                     size="small"
                 />
             </div>
@@ -143,15 +142,15 @@ export const RatingStats = ({ stats }) => {
     return (
         <div className="bg-gray-800/20 backdrop-blur-sm rounded-xl p-6 border border-gray-600/30">
             <h4 className="text-white font-semibold mb-4">Rating Overview</h4>
-            
+
             {/* Overall Rating */}
             <div className="flex items-center space-x-4 mb-6">
                 <div className="text-center">
                     <div className="text-3xl font-bold text-yellow-400 mb-1">
                         {averageRating ? averageRating.toFixed(1) : '0.0'}
                     </div>
-                    <RatingDisplay 
-                        averageRating={averageRating} 
+                    <RatingDisplay
+                        averageRating={averageRating}
                         totalRatings={totalRatings}
                         size="normal"
                     />
@@ -159,7 +158,7 @@ export const RatingStats = ({ stats }) => {
                         {totalRatings} {totalRatings === 1 ? 'rating' : 'ratings'}
                     </p>
                 </div>
-                
+
                 {/* Distribution */}
                 <div className="flex-1">
                     {[5, 4, 3, 2, 1].map((stars) => (

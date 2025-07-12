@@ -61,8 +61,8 @@ const RatingModal = ({
                     >
                         <Star
                             className={`w-8 h-8 transition-all duration-200 ${star <= (hoveredRating || rating)
-                                    ? 'text-yellow-400 fill-yellow-400'
-                                    : 'text-gray-400'
+                                ? 'text-yellow-400 fill-yellow-400'
+                                : 'text-gray-400'
                                 }`}
                         />
                     </motion.button>
@@ -121,7 +121,7 @@ const RatingModal = ({
                         <div className="w-12 h-12 rounded-full bg-gradient-to-r from-purple-500/20 to-cyan-500/20 border-2 border-gray-600/30 flex items-center justify-center overflow-hidden">
                             {otherUser.profilePhoto ? (
                                 <img
-                                    src={otherUser.profilePhoto.startsWith('http') ? otherUser.profilePhoto : `http://localhost:8000${otherUser.profilePhoto}`}
+                                    src={otherUser.profilePhoto}
                                     alt={otherUser.name}
                                     className="w-full h-full object-cover"
                                 />

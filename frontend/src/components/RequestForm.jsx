@@ -480,7 +480,7 @@ const RequestForm = () => {
                                             <div className="w-16 h-16 rounded-full bg-gradient-to-r from-purple-500/20 to-cyan-500/20 border-2 border-gray-600/30 flex items-center justify-center overflow-hidden flex-shrink-0">
                                                 {otherUser.profilePhoto ? (
                                                     <img
-                                                        src={otherUser.profilePhoto.startsWith('http') ? otherUser.profilePhoto : `http://localhost:8000${otherUser.profilePhoto}`}
+                                                        src={otherUser.profilePhoto}
                                                         alt={otherUser.name}
                                                         className="w-full h-full object-cover"
                                                     />

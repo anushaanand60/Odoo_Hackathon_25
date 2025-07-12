@@ -125,12 +125,11 @@ const Profile = () => {
             setLocation(profileData.location || '');
             setProfilePhoto(profileData.profilePhoto || '');
 
-            // Handle photo preview - make sure we have the full URL
+            // Handle photo preview - Cloudinary URLs are already complete
             const photoUrl = profileData.profilePhoto;
             if (photoUrl) {
-                const fullPhotoUrl = photoUrl.startsWith('http') ? photoUrl : `http://localhost:8000${photoUrl}`;
-                setProfilePhotoPreview(fullPhotoUrl);
-                console.log('Setting photo preview to:', fullPhotoUrl);
+                setProfilePhotoPreview(photoUrl);
+                console.log('Setting photo preview to:', photoUrl);
             } else {
                 setProfilePhotoPreview('');
             }
@@ -219,7 +218,7 @@ const Profile = () => {
             }
 
             const data = await response.json();
-            return data.photoUrl;
+            return data.photoUrl; // Cloudinary URL is already complete
         } catch (error) {
             console.error('Error uploading photo:', error);
             throw error;
@@ -601,7 +600,7 @@ const Profile = () => {
                                         <div className="w-32 h-32 rounded-full bg-gradient-to-r from-purple-500/20 to-cyan-500/20 border-2 border-gray-600/30 flex items-center justify-center overflow-hidden">
                                             {profilePhotoPreview ? (
                                                 <img
-                                                    src={profilePhotoPreview.startsWith('http') ? profilePhotoPreview : `http://localhost:8000${profilePhotoPreview}`}
+                                                    src={profilePhotoPreview}
                                                     alt="Profile"
                                                     className="w-full h-full object-cover"
                                                     onError={(e) => {

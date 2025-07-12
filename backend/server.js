@@ -2,7 +2,6 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { PrismaClient } = require('@prisma/client');
-const { ensureUploadDirs, cleanupTempFiles } = require('./utils/fileUtils');
 const authRoutes = require('./routes/auth');
 const profileRoutes = require('./routes/profile');
 const skillsRoutes = require('./routes/skills');
@@ -15,20 +14,8 @@ const projectsRoutes = require('./routes/projects');
 const app = express();
 const prisma = new PrismaClient();
 
-// Initialize upload directories
-ensureUploadDirs();
-
-// Clean up temp files on startup
-cleanupTempFiles();
-
-// Schedule cleanup every 24 hours
-setInterval(cleanupTempFiles, 24 * 60 * 60 * 1000);
-
 app.use(cors());
 app.use(express.json());
-
-// Serve uploaded files statically
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -55,5 +42,5 @@ app.use((error, req, res, next) => {
 const PORT = process.env.PORT || 8000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
-    console.log(`Upload directory: ${path.join(__dirname, 'uploads')}`);
+    console.log(`Using Cloudinary for image storage`);
 });

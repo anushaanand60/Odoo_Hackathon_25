@@ -553,7 +553,7 @@ const UsersTab = ({ setError, setSuccess }) => {
                                         <div className="w-12 h-12 rounded-full bg-gradient-to-r from-red-500/20 to-orange-500/20 flex items-center justify-center">
                                             {user.profilePhoto ? (
                                                 <img
-                                                    src={user.profilePhoto.startsWith('http') ? user.profilePhoto : `http://localhost:8000${user.profilePhoto}`}
+                                                    src={user.profilePhoto}
                                                     alt={user.name}
                                                     className="w-full h-full rounded-full object-cover"
                                                 />

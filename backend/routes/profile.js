@@ -2,50 +2,11 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const { PrismaClient } = require('@prisma/client');
 const z = require('zod');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const authenticate = require('../utils/authmiddleware');
+const { upload, deleteImage, extractPublicId } = require('../utils/cloudinary');
 
 const router = express.Router();
 const prisma = new PrismaClient();
-
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const uploadDir = 'uploads/profiles';
-        // Create directory if it doesn't exist
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-        }
-        cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-        // Generate unique filename with timestamp and random number
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        const fileExtension = path.extname(file.originalname);
-        cb(null, `profile-${uniqueSuffix}${fileExtension}`);
-    }
-});
-
-const upload = multer({
-    storage: storage,
-    limits: {
-        fileSize: 5 * 1024 * 1024 // 5MB limit
-    },
-    fileFilter: (req, file, cb) => {
-        // Check file type
-        const allowedTypes = /jpeg|jpg|png|gif|webp/;
-        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-        const mimetype = allowedTypes.test(file.mimetype);
-
-        if (mimetype && extname) {
-            return cb(null, true);
-        } else {
-            cb(new Error('Only image files (JPEG, JPG, PNG, GIF, WebP) are allowed'));
-        }
-    }
-});
 
 const profileSchema = z.object({
     name: z.string().optional(),
@@ -55,41 +16,65 @@ const profileSchema = z.object({
     isPublic: z.boolean().optional(),
 });
 
-// Photo upload endpoint
+// Photo upload endpoint with Cloudinary
 router.post('/upload-photo', authenticate, upload.single('profilePhoto'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ error: 'No file uploaded' });
         }
 
-        // Create the URL path for the uploaded file
-        const photoUrl = `/uploads/profiles/${req.file.filename}`;
+        // Get the old profile photo to delete it later
+        const currentUser = await prisma.user.findUnique({
+            where: { id: req.userId },
+            select: { profilePhoto: true }
+        });
 
-        // Optionally update the user's profile photo in the database immediately
+        // The file is already uploaded to Cloudinary by multer-storage-cloudinary
+        const photoUrl = req.file.path; // Cloudinary URL
+        const publicId = req.file.filename; // Cloudinary public ID
+
+        // Update the user's profile photo in the database
         await prisma.user.update({
             where: { id: req.userId },
             data: { profilePhoto: photoUrl }
         });
 
+        // Delete the old photo from Cloudinary if it exists
+        if (currentUser?.profilePhoto && currentUser.profilePhoto.includes('cloudinary.com')) {
+            try {
+                const oldPublicId = extractPublicId(currentUser.profilePhoto);
+                if (oldPublicId) {
+                    await deleteImage(oldPublicId);
+                }
+            } catch (deleteError) {
+                console.error('Error deleting old photo from Cloudinary:', deleteError);
+                // Don't fail the upload if old photo deletion fails
+            }
+        }
+
         res.json({
             message: 'Photo uploaded successfully',
             photoUrl: photoUrl,
-            filename: req.file.filename,
+            publicId: publicId,
             size: req.file.size
         });
     } catch (error) {
         console.error('Photo upload error:', error);
 
-        // Clean up uploaded file if database update fails
-        if (req.file && fs.existsSync(req.file.path)) {
-            fs.unlinkSync(req.file.path);
+        // If database update fails, try to delete the uploaded file from Cloudinary
+        if (req.file?.filename) {
+            try {
+                await deleteImage(req.file.filename);
+            } catch (deleteError) {
+                console.error('Error cleaning up uploaded file:', deleteError);
+            }
         }
 
         res.status(500).json({ error: 'Failed to upload photo' });
     }
 });
 
-// Delete photo endpoint
+// Delete photo endpoint with Cloudinary
 router.delete('/delete-photo', authenticate, async (req, res) => {
     try {
         const user = await prisma.user.findUnique({
@@ -98,10 +83,17 @@ router.delete('/delete-photo', authenticate, async (req, res) => {
         });
 
         if (user && user.profilePhoto) {
-            // Remove file from filesystem
-            const filePath = path.join(__dirname, '..', user.profilePhoto);
-            if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
+            // Delete from Cloudinary if it's a Cloudinary URL
+            if (user.profilePhoto.includes('cloudinary.com')) {
+                try {
+                    const publicId = extractPublicId(user.profilePhoto);
+                    if (publicId) {
+                        await deleteImage(publicId);
+                    }
+                } catch (deleteError) {
+                    console.error('Error deleting photo from Cloudinary:', deleteError);
+                    // Continue to update database even if Cloudinary deletion fails
+                }
             }
 
             // Update database

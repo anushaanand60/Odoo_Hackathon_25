@@ -482,7 +482,7 @@ const Search = () => {
                                             <div className="w-16 h-16 rounded-full bg-gradient-to-r from-purple-500/20 to-cyan-500/20 border-2 border-gray-600/30 flex items-center justify-center overflow-hidden">
                                                 {user.profilePhoto ? (
                                                     <img
-                                                        src={user.profilePhoto.startsWith('http') ? user.profilePhoto : `http://localhost:8000${user.profilePhoto}`}
+                                                        src={user.profilePhoto}
                                                         alt={user.name}
                                                         className="w-full h-full object-cover"
                                                     />
@@ -665,7 +665,7 @@ const Search = () => {
                                     <div className="w-20 h-20 rounded-full bg-gradient-to-r from-purple-500/20 to-cyan-500/20 border-2 border-gray-600/30 flex items-center justify-center overflow-hidden">
                                         {selectedUser.profilePhoto ? (
                                             <img
-                                                src={selectedUser.profilePhoto.startsWith('http') ? selectedUser.profilePhoto : `http://localhost:8000${selectedUser.profilePhoto}`}
+                                                src={selectedUser.profilePhoto}
                                                 alt={selectedUser.name}
                                                 className="w-full h-full object-cover"
                                             />
