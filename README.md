@@ -1,6 +1,18 @@
 # 🎯 SkillSwap - Peer-to-Peer Skill Exchange Platform
 
 A modern, full-stack web application that connects people who want to learn new skills with those who can teach them. Built with React, Node.js, PostgreSQL, and deployed with cloud-first architecture.
+### ▶️ [📹 Demo Video](https://drive.google.com/file/d/1no7LqJfH214hRIaCx2rQwi3vwE4NbiEm/view?usp=sharing)
+
+## 📌 Problem Statement
+**Skill Swap Platform**  
+Develop a Skill Swap Platform — a mini application that enables users to list their skills and request others in return.
+
+## 👥 Team Members (TRIPLE-A)
+- **Anusha Anand** - anusha23113@iiitd.ac.in
+- **Anika Aharwal** - anika23086@iitd.ac.in
+- **Abhishek Bhardwaj** - bhardwajabhi2701@gmail.com
+
+### 📄 Functional Requirements:
 
 ## 🌟 Features
 
