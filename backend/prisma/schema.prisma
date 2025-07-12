@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  password      String
+  name          String?
+  location      String?
+  profilePhoto  String?
+  availability  String?        // e.g., "weekends,evenings"
+  isPublic      Boolean        @default(true)
+  skills        Skill[]
+  sentRequests  SwapRequest[]  @relation("SentRequests")
+  receivedRequests SwapRequest[] @relation("ReceivedRequests")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model Skill {
+  id            String    @id @default(uuid())
+  name          String
+  type          SkillType // "OFFERED" or "WANTED"
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model SwapRequest {
+  id            String   @id @default(uuid())
+  senderId      String
+  receiverId    String
+  status        RequestStatus @default(PENDING)
+  sender        User     @relation("SentRequests", fields: [senderId], references: [id])
+  receiver      User     @relation("ReceivedRequests", fields: [receiverId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+enum SkillType {
+  OFFERED
+  WANTED
+}
+
+enum RequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
