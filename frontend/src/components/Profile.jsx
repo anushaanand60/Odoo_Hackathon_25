@@ -23,7 +23,7 @@ import {
     Upload,
     Image as ImageIcon
 } from 'lucide-react';
-import { getProfile, updateProfile, addSkill } from '../services/api';
+import { getProfile, updateProfile, addSkill, removeSkill } from '../services/api';
 
 const Profile = () => {
     const [profile, setProfile] = useState({});
@@ -40,6 +40,8 @@ const Profile = () => {
     // Individual saving states
     const [savingBasicInfo, setSavingBasicInfo] = useState(false);
     const [savingAvailability, setSavingAvailability] = useState(false);
+    const [savingOfferedSkills, setSavingOfferedSkills] = useState(false);
+    const [savingWantedSkills, setSavingWantedSkills] = useState(false);
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
     // Form states
@@ -52,6 +54,11 @@ const Profile = () => {
     const [isPublic, setIsPublic] = useState(true);
     const [skillsOffered, setSkillsOffered] = useState([]);
     const [skillsWanted, setSkillsWanted] = useState([]);
+
+    // Track original skills and skills to be removed
+    const [originalSkillsOffered, setOriginalSkillsOffered] = useState([]);
+    const [originalSkillsWanted, setOriginalSkillsWanted] = useState([]);
+    const [skillsToRemove, setSkillsToRemove] = useState([]);
 
     // New skill input states
     const [newOfferedSkill, setNewOfferedSkill] = useState('');
@@ -90,7 +97,7 @@ const Profile = () => {
             // Handle photo preview - make sure we have the full URL
             const photoUrl = profileData.profilePhoto;
             if (photoUrl) {
-                const fullPhotoUrl = photoUrl.startsWith('http') ? photoUrl : `http://localhost:8000${photoUrl}`;
+                const fullPhotoUrl = photoUrl.startsWith('http') ? photoUrl : `http://localhost:5000${photoUrl}`;
                 setProfilePhotoPreview(fullPhotoUrl);
                 console.log('Setting photo preview to:', fullPhotoUrl);
             } else {
@@ -99,8 +106,19 @@ const Profile = () => {
 
             setAvailability(profileData.availability ? profileData.availability.split(',') : []);
             setIsPublic(profileData.isPublic !== false);
-            setSkillsOffered(profileData.skills?.filter(skill => skill.type === 'OFFERED') || []);
-            setSkillsWanted(profileData.skills?.filter(skill => skill.type === 'WANTED') || []);
+
+            const offeredSkills = profileData.skills?.filter(skill => skill.type === 'OFFERED') || [];
+            const wantedSkills = profileData.skills?.filter(skill => skill.type === 'WANTED') || [];
+
+            setSkillsOffered(offeredSkills);
+            setSkillsWanted(wantedSkills);
+
+            // Store original skills for comparison
+            setOriginalSkillsOffered(offeredSkills);
+            setOriginalSkillsWanted(wantedSkills);
+
+            // Clear skills to remove when fetching fresh data
+            setSkillsToRemove([]);
         } catch (err) {
             console.error('Error fetching profile:', err);
             setError('Failed to load profile');
@@ -245,15 +263,16 @@ const Profile = () => {
 
         try {
             const token = localStorage.getItem('token');
-            await addSkill({ name: skillName.trim(), type }, token);
+            const newSkill = await addSkill({ name: skillName.trim(), type }, token);
 
             if (type === 'OFFERED') {
+                setSkillsOffered(prev => [...prev, newSkill.data]);
                 setNewOfferedSkill('');
             } else {
+                setSkillsWanted(prev => [...prev, newSkill.data]);
                 setNewWantedSkill('');
             }
 
-            await fetchProfile();
             setSuccess(`Skill added successfully!`);
         } catch (err) {
             console.error('Error adding skill:', err);
@@ -261,16 +280,106 @@ const Profile = () => {
         }
     };
 
-    const handleRemoveSkill = async (skillId) => {
+    // Remove skill from frontend only
+    const handleRemoveSkillFromFrontend = (skillId, type) => {
+        if (type === 'OFFERED') {
+            setSkillsOffered(prev => prev.filter(skill => skill.id !== skillId));
+        } else {
+            setSkillsWanted(prev => prev.filter(skill => skill.id !== skillId));
+        }
+
+        // Add to removal list if it's an existing skill (has an ID from backend)
+        const isExistingSkill = (type === 'OFFERED' ? originalSkillsOffered : originalSkillsWanted)
+            .some(skill => skill.id === skillId);
+
+        if (isExistingSkill) {
+            setSkillsToRemove(prev => [...prev, skillId]);
+        }
+    };
+
+    // Save offered skills changes to backend
+    const handleSaveOfferedSkills = async () => {
+        setSavingOfferedSkills(true);
+        setError('');
+        setSuccess('');
+
         try {
             const token = localStorage.getItem('token');
-            // You'll need to implement this endpoint
-            // await removeSkill(skillId, token);
+
+            // Remove skills that were marked for removal
+            const skillsToRemoveOffered = skillsToRemove.filter(skillId =>
+                originalSkillsOffered.some(skill => skill.id === skillId)
+            );
+
+            for (const skillId of skillsToRemoveOffered) {
+                await removeSkill(skillId, token);
+            }
+
+            // Clear the removal list for offered skills
+            setSkillsToRemove(prev => prev.filter(skillId =>
+                !originalSkillsOffered.some(skill => skill.id === skillId)
+            ));
+
+            setSuccess('Offered skills updated successfully!');
+            setEditOfferedSkills(false);
             await fetchProfile();
         } catch (err) {
-            console.error('Error removing skill:', err);
-            setError('Failed to remove skill');
+            console.error('Error updating offered skills:', err);
+            setError('Failed to update offered skills');
+        } finally {
+            setSavingOfferedSkills(false);
         }
+    };
+
+    // Save wanted skills changes to backend
+    const handleSaveWantedSkills = async () => {
+        setSavingWantedSkills(true);
+        setError('');
+        setSuccess('');
+
+        try {
+            const token = localStorage.getItem('token');
+
+            // Remove skills that were marked for removal
+            const skillsToRemoveWanted = skillsToRemove.filter(skillId =>
+                originalSkillsWanted.some(skill => skill.id === skillId)
+            );
+
+            for (const skillId of skillsToRemoveWanted) {
+                await removeSkill(skillId, token);
+            }
+
+            // Clear the removal list for wanted skills
+            setSkillsToRemove(prev => prev.filter(skillId =>
+                !originalSkillsWanted.some(skill => skill.id === skillId)
+            ));
+
+            setSuccess('Wanted skills updated successfully!');
+            setEditWantedSkills(false);
+            await fetchProfile();
+        } catch (err) {
+            console.error('Error updating wanted skills:', err);
+            setError('Failed to update wanted skills');
+        } finally {
+            setSavingWantedSkills(false);
+        }
+    };
+
+    // Cancel skill edits and restore original state
+    const handleCancelSkillEdits = (type) => {
+        if (type === 'OFFERED') {
+            setSkillsOffered(originalSkillsOffered);
+            setEditOfferedSkills(false);
+        } else {
+            setSkillsWanted(originalSkillsWanted);
+            setEditWantedSkills(false);
+        }
+
+        // Clear skills to remove for this type
+        setSkillsToRemove(prev => prev.filter(skillId => {
+            const originalSkills = type === 'OFFERED' ? originalSkillsOffered : originalSkillsWanted;
+            return !originalSkills.some(skill => skill.id === skillId);
+        }));
     };
 
     const handleLogout = () => {
@@ -407,7 +516,7 @@ const Profile = () => {
                                     <div className="w-32 h-32 rounded-full bg-gradient-to-r from-purple-500/20 to-cyan-500/20 border-2 border-gray-600/30 flex items-center justify-center overflow-hidden">
                                         {profilePhotoPreview ? (
                                             <img
-                                                src={profilePhotoPreview.startsWith('http') ? profilePhotoPreview : `http://localhost:8000${profilePhotoPreview}`}
+                                                src={profilePhotoPreview.startsWith('http') ? profilePhotoPreview : `http://localhost:5000${profilePhotoPreview}`}
                                                 alt="Profile"
                                                 className="w-full h-full object-cover"
                                                 onError={(e) => {
@@ -639,15 +748,43 @@ const Profile = () => {
                             <Star className="w-6 h-6 text-yellow-400" />
                             <h3 className="text-2xl font-bold text-white">Skills I Offer</h3>
                         </div>
-                        <motion.button
-                            onClick={() => setEditOfferedSkills(!editOfferedSkills)}
-                            className="flex items-center space-x-2 px-4 py-2 bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-400 rounded-xl transition-all duration-300 border border-yellow-600/30"
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                        >
-                            <Edit2 className="w-4 h-4" />
-                            <span>{editOfferedSkills ? 'Done' : 'Edit'}</span>
-                        </motion.button>
+                        <div className="flex items-center space-x-2">
+                            {editOfferedSkills && (
+                                <motion.button
+                                    onClick={() => handleCancelSkillEdits('OFFERED')}
+                                    className="flex items-center space-x-2 px-4 py-2 bg-gray-600/20 hover:bg-gray-600/30 text-gray-400 rounded-xl transition-all duration-300 border border-gray-600/30"
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                >
+                                    <X className="w-4 h-4" />
+                                    <span>Cancel</span>
+                                </motion.button>
+                            )}
+                            <motion.button
+                                onClick={() => editOfferedSkills ? handleSaveOfferedSkills() : setEditOfferedSkills(true)}
+                                disabled={savingOfferedSkills}
+                                className="flex items-center space-x-2 px-4 py-2 bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-400 rounded-xl transition-all duration-300 border border-yellow-600/30 disabled:opacity-50"
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                            >
+                                {savingOfferedSkills ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        <span>Saving...</span>
+                                    </>
+                                ) : editOfferedSkills ? (
+                                    <>
+                                        <Save className="w-4 h-4" />
+                                        <span>Done</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Edit2 className="w-4 h-4" />
+                                        <span>Edit</span>
+                                    </>
+                                )}
+                            </motion.button>
+                        </div>
                     </div>
 
                     <div className="space-y-4">
@@ -699,7 +836,7 @@ const Profile = () => {
                                                 type="button"
                                                 onClick={(e) => {
                                                     e.preventDefault();
-                                                    handleRemoveSkill(skill.id);
+                                                    handleRemoveSkillFromFrontend(skill.id, 'OFFERED');
                                                 }}
                                                 className="opacity-0 group-hover:opacity-100 w-6 h-6 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-full flex items-center justify-center transition-all duration-300"
                                                 whileHover={{ scale: 1.1 }}
@@ -734,15 +871,43 @@ const Profile = () => {
                             <Settings className="w-6 h-6 text-emerald-400" />
                             <h3 className="text-2xl font-bold text-white">Skills I Want to Learn</h3>
                         </div>
-                        <motion.button
-                            onClick={() => setEditWantedSkills(!editWantedSkills)}
-                            className="flex items-center space-x-2 px-4 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 rounded-xl transition-all duration-300 border border-emerald-600/30"
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                        >
-                            <Edit2 className="w-4 h-4" />
-                            <span>{editWantedSkills ? 'Done' : 'Edit'}</span>
-                        </motion.button>
+                        <div className="flex items-center space-x-2">
+                            {editWantedSkills && (
+                                <motion.button
+                                    onClick={() => handleCancelSkillEdits('WANTED')}
+                                    className="flex items-center space-x-2 px-4 py-2 bg-gray-600/20 hover:bg-gray-600/30 text-gray-400 rounded-xl transition-all duration-300 border border-gray-600/30"
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                >
+                                    <X className="w-4 h-4" />
+                                    <span>Cancel</span>
+                                </motion.button>
+                            )}
+                            <motion.button
+                                onClick={() => editWantedSkills ? handleSaveWantedSkills() : setEditWantedSkills(true)}
+                                disabled={savingWantedSkills}
+                                className="flex items-center space-x-2 px-4 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 rounded-xl transition-all duration-300 border border-emerald-600/30 disabled:opacity-50"
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                            >
+                                {savingWantedSkills ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        <span>Saving...</span>
+                                    </>
+                                ) : editWantedSkills ? (
+                                    <>
+                                        <Save className="w-4 h-4" />
+                                        <span>Done</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Edit2 className="w-4 h-4" />
+                                        <span>Edit</span>
+                                    </>
+                                )}
+                            </motion.button>
+                        </div>
                     </div>
 
                     <div className="space-y-4">
@@ -794,7 +959,7 @@ const Profile = () => {
                                                 type="button"
                                                 onClick={(e) => {
                                                     e.preventDefault();
-                                                    handleRemoveSkill(skill.id);
+                                                    handleRemoveSkillFromFrontend(skill.id, 'WANTED');
                                                 }}
                                                 className="opacity-0 group-hover:opacity-100 w-6 h-6 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-full flex items-center justify-center transition-all duration-300"
                                                 whileHover={{ scale: 1.1 }}

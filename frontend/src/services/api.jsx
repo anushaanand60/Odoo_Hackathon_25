@@ -14,6 +14,7 @@ export const updateProfile = async (data, token) => api.put('/profile/update', d
 
 // Skills Functions (expand as needed)
 export const addSkill = async (data, token) => api.post('/skills/add', data, { headers: { Authorization: `Bearer ${token}` } });
-// ... add more for remove, get, etc.
+export const removeSkill = async (skillId, token) => api.delete(`/skills/${skillId}`, { headers: { Authorization: `Bearer ${token}` } });
+export const getSkills = async (token) => api.get('/skills', { headers: { Authorization: `Bearer ${token}` } });
 
 export default api;

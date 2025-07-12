@@ -25,9 +25,30 @@ router.post('/add', authenticate, async (req, res) => {
 
 router.delete('/:id', authenticate, async (req, res) => {
     try {
-        await prisma.skill.delete({ where: { id: req.params.id } });
-        res.json({ message: 'Skill removed' });
+        // First check if the skill belongs to the authenticated user
+        const skill = await prisma.skill.findUnique({
+            where: { id: req.params.id }
+        });
+
+        if (!skill) {
+            return res.status(404).json({ error: 'Skill not found' });
+        }
+
+        if (skill.userId !== req.userId) {
+            return res.status(403).json({ error: 'Unauthorized to delete this skill' });
+        }
+
+        // Delete the skill
+        await prisma.skill.delete({
+            where: {
+                id: req.params.id,
+                userId: req.userId  // Double-check ownership
+            }
+        });
+
+        res.json({ message: 'Skill removed successfully' });
     } catch (error) {
+        console.error('Error removing skill:', error);
         res.status(400).json({ error: error.message });
     }
 });
