@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const adminApiClient = axios.create({
-    baseURL: '/api/admin',
+    baseURL: process.env.VITE_API_URL,
 });
 
 // Dashboard

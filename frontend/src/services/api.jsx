@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: process.env.REACT_APP_API_URL,  // Relative to proxy (will hit backend)
+    baseURL: process.env.VITE_API_URL,  // Relative to proxy (will hit backend)
 });
 
 // Auth Functions
