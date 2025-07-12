@@ -136,7 +136,8 @@ router.get('/', authenticate, async (req, res) => {
         const user = await prisma.user.findUnique({
             where: { id: req.userId },
             include: {
-                skills: true
+                skills: true,
+                projects: { include: { skills: true } }
             }
         });
 
