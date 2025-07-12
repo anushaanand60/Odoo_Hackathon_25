@@ -762,9 +762,24 @@ const Search = () => {
                                                 ? 'bg-yellow-600/20 text-yellow-400 border-yellow-600/30'
                                                 : 'bg-gray-600/20 text-gray-400 border-gray-600/30'
                                             }`}>
-                                            {selectedUser.requestStatus === 'ACCEPTED' ? 'Swap Completed' :
+                                            {selectedUser.requestStatus === 'ACCEPTED' ? 'Awaiting Mutual Rating' :
                                                 selectedUser.requestStatus === 'PENDING' ? 'Request Pending' :
                                                     'Request Already Sent'}
+                                        </div>
+                                    ) : selectedUser.mutualRatingComplete ? (
+                                        <div className="flex flex-col items-end space-y-2">
+                                            <div className="px-4 py-2 bg-blue-600/20 text-blue-400 border border-blue-600/30 rounded-lg text-sm">
+                                                ✨ Previous swap completed & rated
+                                            </div>
+                                            <motion.button
+                                                onClick={() => setShowRequestModal(true)}
+                                                className="flex items-center space-x-2 px-6 py-3 bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 rounded-xl transition-all duration-300 border border-purple-600/30"
+                                                whileHover={{ scale: 1.05 }}
+                                                whileTap={{ scale: 0.95 }}
+                                            >
+                                                <MessageCircle className="w-4 h-4" />
+                                                <span>Send New Swap Request</span>
+                                            </motion.button>
                                         </div>
                                     ) : (
                                         <motion.button

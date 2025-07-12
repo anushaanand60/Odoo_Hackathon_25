@@ -12,8 +12,8 @@ router.get('/users', authenticate, async (req, res) => {
         const { skill, page = 1, limit = 20 } = req.query;
         const offset = (page - 1) * limit;
 
-        // Get users who have accepted swap requests with current user
-        const acceptedSwapUsers = await prisma.swapRequest.findMany({
+        // Get users who have accepted swap requests with current user but haven't completed mutual rating
+        const acceptedSwapRequests = await prisma.swapRequest.findMany({
             where: {
                 OR: [
                     { senderId: req.userId, status: 'ACCEPTED' },
@@ -21,19 +21,34 @@ router.get('/users', authenticate, async (req, res) => {
                 ]
             },
             select: {
+                id: true,
                 senderId: true,
-                receiverId: true
+                receiverId: true,
+                ratings: {
+                    select: {
+                        raterId: true,
+                        ratedUserId: true
+                    }
+                }
             }
         });
 
-        // Extract user IDs to exclude (users with accepted swaps)
+        // Extract user IDs to exclude (users with accepted swaps who haven't completed mutual rating)
         const excludedUserIds = new Set();
-        acceptedSwapUsers.forEach(request => {
-            if (request.senderId !== req.userId) {
-                excludedUserIds.add(request.senderId);
-            }
-            if (request.receiverId !== req.userId) {
-                excludedUserIds.add(request.receiverId);
+        acceptedSwapRequests.forEach(request => {
+            const otherUserId = request.senderId === req.userId ? request.receiverId : request.senderId;
+
+            // Check if both users have rated each other for this swap
+            const currentUserRated = request.ratings.some(rating =>
+                rating.raterId === req.userId && rating.ratedUserId === otherUserId
+            );
+            const otherUserRated = request.ratings.some(rating =>
+                rating.raterId === otherUserId && rating.ratedUserId === req.userId
+            );
+
+            // Only exclude if mutual rating is not complete
+            if (!currentUserRated || !otherUserRated) {
+                excludedUserIds.add(otherUserId);
             }
         });
 
@@ -131,7 +146,7 @@ router.get('/users/:id', authenticate, async (req, res) => {
             return res.status(404).json({ error: 'User not found or profile is private' });
         }
 
-        // Check if current user has already sent a swap request to this user or has an accepted swap
+        // Check if current user has already sent a swap request to this user
         const existingRequest = await prisma.swapRequest.findFirst({
             where: {
                 OR: [
@@ -141,13 +156,49 @@ router.get('/users/:id', authenticate, async (req, res) => {
                 status: {
                     in: ['PENDING', 'ACCEPTED']
                 }
+            },
+            include: {
+                ratings: {
+                    select: {
+                        raterId: true,
+                        ratedUserId: true
+                    }
+                }
             }
         });
 
+        let requestStatus = null;
+        let hasExistingRequest = false;
+        let mutualRatingComplete = false;
+
+        if (existingRequest) {
+            if (existingRequest.status === 'PENDING') {
+                hasExistingRequest = true;
+                requestStatus = 'PENDING';
+            } else if (existingRequest.status === 'ACCEPTED') {
+                // Check if mutual rating is complete
+                const currentUserRated = existingRequest.ratings.some(rating => 
+                    rating.raterId === req.userId && rating.ratedUserId === req.params.id
+                );
+                const otherUserRated = existingRequest.ratings.some(rating => 
+                    rating.raterId === req.params.id && rating.ratedUserId === req.userId
+                );
+                
+                mutualRatingComplete = currentUserRated && otherUserRated;
+                
+                if (!mutualRatingComplete) {
+                    hasExistingRequest = true;
+                    requestStatus = 'ACCEPTED';
+                }
+                // If mutual rating is complete, treat as if no existing request (allows new requests)
+            }
+        }
+
         res.json({
             ...user,
-            hasExistingRequest: !!existingRequest,
-            requestStatus: existingRequest?.status || null
+            hasExistingRequest,
+            requestStatus,
+            mutualRatingComplete
         });
     } catch (error) {
         console.error('Get user profile error:', error);
@@ -222,55 +273,55 @@ router.get('/trending-skills', authenticate, async (req, res) => {
 
 // Get top 5 users by points
 router.get('/top-points', authenticate, async (req, res) => {
-  try {
-    const top = await prisma.user.findMany({
-      where: { isPublic: true },
-      orderBy: { points: 'desc' },
-      take: 5,
-      select: {
-        id: true,
-        name: true,
-        profilePhoto: true,
-        points: true
-      }
-    });
-    res.json(top);
-  } catch (error) {
-    console.error('Get top points error:', error);
-    res.status(500).json({ error: 'Failed to fetch top users by points' });
-  }
+    try {
+        const top = await prisma.user.findMany({
+            where: { isPublic: true },
+            orderBy: { points: 'desc' },
+            take: 5,
+            select: {
+                id: true,
+                name: true,
+                profilePhoto: true,
+                points: true
+            }
+        });
+        res.json(top);
+    } catch (error) {
+        console.error('Get top points error:', error);
+        res.status(500).json({ error: 'Failed to fetch top users by points' });
+    }
 });
 
 // Get top 5 users by average rating
 router.get('/top-ratings', authenticate, async (req, res) => {
-  try {
-    const users = await prisma.user.findMany({
-      where: { isPublic: true },
-      select: {
-        id: true,
-        name: true,
-        profilePhoto: true,
-        receivedRatings: {
-          select: { rating: true }
-        }
-      }
-    });
-    const top = users
-      .map(u => ({
-        id: u.id,
-        name: u.name,
-        profilePhoto: u.profilePhoto,
-        averageRating: u.receivedRatings.length > 0 ? 
-          u.receivedRatings.reduce((sum, r) => sum + r.rating, 0) / u.receivedRatings.length : 0,
-        totalRatings: u.receivedRatings.length
-      }))
-      .sort((a, b) => b.averageRating - a.averageRating || b.totalRatings - a.totalRatings)
-      .slice(0, 5);
-    res.json(top);
-  } catch (error) {
-    console.error('Get top ratings error:', error);
-    res.status(500).json({ error: 'Failed to fetch top users by ratings' });
-  }
+    try {
+        const users = await prisma.user.findMany({
+            where: { isPublic: true },
+            select: {
+                id: true,
+                name: true,
+                profilePhoto: true,
+                receivedRatings: {
+                    select: { rating: true }
+                }
+            }
+        });
+        const top = users
+            .map(u => ({
+                id: u.id,
+                name: u.name,
+                profilePhoto: u.profilePhoto,
+                averageRating: u.receivedRatings.length > 0 ?
+                    u.receivedRatings.reduce((sum, r) => sum + r.rating, 0) / u.receivedRatings.length : 0,
+                totalRatings: u.receivedRatings.length
+            }))
+            .sort((a, b) => b.averageRating - a.averageRating || b.totalRatings - a.totalRatings)
+            .slice(0, 5);
+        res.json(top);
+    } catch (error) {
+        console.error('Get top ratings error:', error);
+        res.status(500).json({ error: 'Failed to fetch top users by ratings' });
+    }
 });
 
 module.exports = router;
