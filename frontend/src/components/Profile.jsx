@@ -21,9 +21,10 @@ import {
     CheckCircle,
     AlertCircle,
     Upload,
-    Image as ImageIcon
+    Image as ImageIcon,
+    Briefcase
 } from 'lucide-react';
-import { getProfile, updateProfile, addSkill, removeSkill, getRatingStats, getUserRatings, getAllSkills, getTrendingSkills } from '../services/api';
+import { getProfile, updateProfile, addSkill, removeSkill, getRatingStats, getUserRatings, getAllSkills, getTrendingSkills, addProject, removeProject } from '../services/api';
 import Navbar from './Navbar';
 import { MainContent } from './Layout';
 import RatingDisplay, { RatingCard, RatingStats } from './RatingDisplay';
@@ -76,6 +77,14 @@ const Profile = () => {
     // Skills data for autocomplete
     const [availableSkills, setAvailableSkills] = useState({});
     const [trendingSkills, setTrendingSkills] = useState([]);
+
+    // Projects states
+    const [projects, setProjects] = useState([]);
+    const [editProjects, setEditProjects] = useState(false);
+    const [savingProjects, setSavingProjects] = useState(false);
+    const [newProject, setNewProject] = useState({ title: '', description: '', url: '', skillIds: [] });
+    const [originalProjects, setOriginalProjects] = useState([]);
+    const [projectsToRemove, setProjectsToRemove] = useState([]);
 
     const navigate = useNavigate();
     const fileInputRef = useRef(null);
@@ -141,6 +150,11 @@ const Profile = () => {
 
             // Clear skills to remove when fetching fresh data
             setSkillsToRemove([]);
+
+            setProjects(profileData.projects || []);
+            setOriginalProjects(profileData.projects || []);
+            setProjectsToRemove([]);
+
         } catch (err) {
             console.error('Error fetching profile:', err);
             setError('Failed to load profile');
@@ -402,6 +416,46 @@ const Profile = () => {
             const originalSkills = type === 'OFFERED' ? originalSkillsOffered : originalSkillsWanted;
             return !originalSkills.some(skill => skill.id === skillId);
         }));
+    };
+
+    const handleAddProject = async () => {
+        if (!newProject.title.trim()) return;
+        try {
+            const token = localStorage.getItem('token');
+            const addedProject = await addProject(newProject, token);
+            setProjects(prev => [...prev, addedProject.data]);
+            setNewProject({ title: '', description: '', url: '', skillIds: [] });
+            setSuccess('Project added successfully!');
+        } catch (err) {
+            setError('Failed to add project');
+        }
+    };
+    const handleRemoveProjectFromFrontend = (projectId) => {
+        setProjects(prev => prev.filter(p => p.id !== projectId));
+        const isExisting = originalProjects.some(p => p.id === projectId);
+        if (isExisting) setProjectsToRemove(prev => [...prev, projectId]);
+    };
+    const handleSaveProjects = async () => {
+        setSavingProjects(true);
+        try {
+            const token = localStorage.getItem('token');
+            for (const id of projectsToRemove) {
+                await removeProject(id, token);
+            }
+            setProjectsToRemove([]);
+            setSuccess('Projects updated!');
+            setEditProjects(false);
+            await fetchProfile();
+        } catch (err) {
+            setError('Failed to update projects');
+        } finally {
+            setSavingProjects(false);
+        }
+    };
+    const handleCancelProjects = () => {
+        setProjects(originalProjects);
+        setEditProjects(false);
+        setProjectsToRemove([]);
     };
 
     const handleLogout = () => {
@@ -873,11 +927,112 @@ const Profile = () => {
                         </div>
                     </motion.div>
 
-                    {/* Skills Wanted Section */}
+                    {/* Projects Section */}
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.4 }}
+                        className="bg-gray-900/20 backdrop-blur-xl rounded-2xl p-8 border border-gray-700/30"
+                    >
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center space-x-3">
+                                <Briefcase className="w-6 h-6 text-indigo-400" />
+                                <h3 className="text-2xl font-bold text-white">My Projects</h3>
+                            </div>
+                            <motion.button
+                                onClick={() => editProjects ? handleSaveProjects() : setEditProjects(true)}
+                                disabled={savingProjects}
+                                className="flex items-center space-x-2 px-4 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 rounded-xl transition-all duration-300 border border-indigo-600/30 disabled:opacity-50"
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                            >
+                                {savingProjects ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        <span>Saving...</span>
+                                    </>
+                                ) : editProjects ? (
+                                    <>
+                                        <Save className="w-4 h-4" />
+                                        <span>Save</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Edit2 className="w-4 h-4" />
+                                        <span>Edit</span>
+                                    </>
+                                )}
+                            </motion.button>
+                        </div>
+
+                        <div className="space-y-4">
+                            {projects.map(project => (
+                                <div key={project.id} className="bg-gray-800/20 p-4 rounded-xl border border-gray-700/20">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <h4 className="text-white font-medium">{project.title}</h4>
+                                            {project.description && <p className="text-gray-400 text-sm">{project.description}</p>}
+                                            {project.url && <a href={project.url} className="text-blue-400 text-sm">{project.url}</a>}
+                                            <div className="mt-2">
+                                                <span className="text-gray-300 text-sm">Related Skills: </span>
+                                                {project.skills.map(skill => skill.name).join(', ')}
+                                            </div>
+                                        </div>
+                                        {editProjects && (
+                                            <button onClick={() => handleRemoveProjectFromFrontend(project.id)} className="text-red-400">
+                                                <X className="w-5 h-5" />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+
+                            {editProjects && (
+                                <div className="bg-gray-800/20 p-4 rounded-xl border border-gray-700/20 space-y-4">
+                                    <input
+                                        type="text"
+                                        value={newProject.title}
+                                        onChange={e => setNewProject({ ...newProject, title: e.target.value })}
+                                        placeholder="Project Title"
+                                        className="w-full px-4 py-3 bg-gray-900/20 text-white rounded-xl border border-gray-600/30 focus:outline-none focus:border-purple-500"
+                                    />
+                                    <textarea
+                                        value={newProject.description}
+                                        onChange={e => setNewProject({ ...newProject, description: e.target.value })}
+                                        placeholder="Description"
+                                        className="w-full px-4 py-3 bg-gray-900/20 text-white rounded-xl border border-gray-600/30 focus:outline-none focus:border-purple-500"
+                                    />
+                                    <input
+                                        type="url"
+                                        value={newProject.url}
+                                        onChange={e => setNewProject({ ...newProject, url: e.target.value })}
+                                        placeholder="Project URL"
+                                        className="w-full px-4 py-3 bg-gray-900/20 text-white rounded-xl border border-gray-600/30 focus:outline-none focus:border-purple-500"
+                                    />
+                                    <select
+                                        multiple
+                                        value={newProject.skillIds}
+                                        onChange={e => setNewProject({ ...newProject, skillIds: Array.from(e.target.selectedOptions, option => option.value) })}
+                                        className="w-full px-4 py-3 bg-gray-900/20 text-white rounded-xl border border-gray-600/30 focus:outline-none focus:border-purple-500"
+                                    >
+                                        {skillsOffered.map(skill => (
+                                            <option key={skill.id} value={skill.id}>{skill.name}</option>
+                                        ))}
+                                    </select>
+                                    <button onClick={handleAddProject} className="flex items-center space-x-2 px-4 py-2 bg-green-600/20 text-green-400 rounded-xl">
+                                        <Plus className="w-4 h-4" />
+                                        <span>Add Project</span>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </motion.div>
+
+                    {/* Skills Wanted Section */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.5 }}
                         className="bg-gray-900/20 backdrop-blur-xl rounded-2xl p-8 border border-gray-700/30"
                     >
                         <div className="flex items-center justify-between mb-6">

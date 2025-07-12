@@ -10,6 +10,7 @@ const searchRoutes = require('./routes/search');
 const requestsRoutes = require('./routes/requests');
 const ratingsRoutes = require('./routes/ratings');
 const adminRoutes = require('./routes/admin');
+const projectsRoutes = require('./routes/projects');
 
 const app = express();
 const prisma = new PrismaClient();
@@ -37,6 +38,7 @@ app.use('/api/search', searchRoutes);
 app.use('/api/requests', requestsRoutes);
 app.use('/api/ratings', ratingsRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/projects', projectsRoutes);
 
 // Error handling middleware
 app.use((error, req, res, next) => {

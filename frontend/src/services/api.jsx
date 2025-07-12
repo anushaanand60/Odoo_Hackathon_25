@@ -82,4 +82,8 @@ export const getRatingStats = async (userId, token) => api.get(`/ratings/stats/$
     headers: { Authorization: `Bearer ${token}` }
 });
 
+export const addProject = async (data, token) => api.post('/projects/add', data, { headers: { Authorization: `Bearer ${token}` } });
+export const removeProject = async (projectId, token) => api.delete(`/projects/${projectId}`, { headers: { Authorization: `Bearer ${token}` } });
+export const getProjects = async (token) => api.get('/projects', { headers: { Authorization: `Bearer ${token}` } });
+
 export default api;
