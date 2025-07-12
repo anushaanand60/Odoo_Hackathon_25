@@ -32,6 +32,10 @@ export const getTrendingSkills = async (token) => api.get('/search/trending-skil
     headers: { Authorization: `Bearer ${token}` }
 });
 
+export const getTopPoints = async (token) => api.get('/search/top-points', { headers: { Authorization: `Bearer ${token}` } });
+
+export const getTopRatings = async (token) => api.get('/search/top-ratings', { headers: { Authorization: `Bearer ${token}` } });
+
 // Swap Request Functions
 export const createSwapRequest = async (data, token) => api.post('/requests/create', data, {
     headers: { Authorization: `Bearer ${token}` }

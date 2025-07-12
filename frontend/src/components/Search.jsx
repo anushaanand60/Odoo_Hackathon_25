@@ -19,7 +19,7 @@ import {
     ChevronLeft,
     ChevronRight
 } from 'lucide-react';
-import { searchUsers, getUserById, getAllSkills, getTrendingSkills, createSwapRequest, getRatingStats } from '../services/api';
+import { searchUsers, getUserById, getAllSkills, getTrendingSkills, createSwapRequest, getRatingStats, getTopPoints, getTopRatings } from '../services/api';
 import Navbar from './Navbar';
 import { MainContent } from './Layout';
 import RatingDisplay from './RatingDisplay';
@@ -36,6 +36,8 @@ const Search = () => {
     const [requestMessage, setRequestMessage] = useState('');
     const [sendingRequest, setSendingRequest] = useState(false);
     const [userRatings, setUserRatings] = useState({});
+    const [topPoints, setTopPoints] = useState([]);
+    const [topRatings, setTopRatings] = useState([]);
 
     // Filters
     const [showFilters, setShowFilters] = useState(false);
@@ -54,6 +56,7 @@ const Search = () => {
         fetchUsers();
         fetchSkills();
         fetchTrendingSkills();
+        fetchTopUsers();
     }, [currentPage, skillFilter]);
 
     useEffect(() => {
@@ -129,6 +132,18 @@ const Search = () => {
             setTrendingSkills(response.data);
         } catch (err) {
             console.error('Error fetching trending skills:', err);
+        }
+    };
+
+    const fetchTopUsers = async () => {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        try {
+            const [pointsRes, ratingsRes] = await Promise.all([getTopPoints(token), getTopRatings(token)]);
+            setTopPoints(pointsRes.data);
+            setTopRatings(ratingsRes.data);
+        } catch (err) {
+            console.error('Error fetching top users:', err);
         }
     };
 
@@ -396,6 +411,61 @@ const Search = () => {
                         </motion.div>
                     ) : (
                         <>
+                            {/* Top Users Sections */}
+                            <div className="mb-12 space-y-8">
+                                {/* Top by Points */}
+                                <div>
+                                    <h2 className="text-2xl font-bold text-white mb-4">Top Users by Points</h2>
+                                    <div className="flex overflow-x-auto gap-4 pb-4">
+                                        {topPoints.map((user, index) => (
+                                            <motion.div
+                                                key={user.id}
+                                                initial={{ opacity: 0, x: -20 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                transition={{ delay: index * 0.1 }}
+                                                className="min-w-[220px] bg-gray-900/20 backdrop-blur-xl rounded-2xl p-4 border border-gray-700/30 hover:border-purple-500/30 transition-all duration-300 cursor-pointer"
+                                                onClick={() => handleUserClick(user.id)}
+                                            >
+                                                <div className="flex items-center space-x-4 mb-3">
+                                                    <div className="w-12 h-12 rounded-full bg-gradient-to-r from-purple-500/20 to-cyan-500/20 overflow-hidden">
+                                                        {user.profilePhoto && <img src={user.profilePhoto} alt={user.name} className="w-full h-full object-cover" />}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-semibold text-white">{user.name}</p>
+                                                        <p className="text-purple-400">Points: {user.points}</p>
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        ))}
+                                    </div>
+                                </div>
+                                {/* Top by Ratings */}
+                                <div>
+                                    <h2 className="text-2xl font-bold text-white mb-4">Top Users by Ratings</h2>
+                                    <div className="flex overflow-x-auto gap-4 pb-4">
+                                        {topRatings.map((user, index) => (
+                                            <motion.div
+                                                key={user.id}
+                                                initial={{ opacity: 0, x: -20 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                transition={{ delay: index * 0.1 }}
+                                                className="min-w-[220px] bg-gray-900/20 backdrop-blur-xl rounded-2xl p-4 border border-gray-700/30 hover:border-cyan-500/30 transition-all duration-300 cursor-pointer"
+                                                onClick={() => handleUserClick(user.id)}
+                                            >
+                                                <div className="flex items-center space-x-4 mb-3">
+                                                    <div className="w-12 h-12 rounded-full bg-gradient-to-r from-cyan-500/20 to-purple-500/20 overflow-hidden">
+                                                        {user.profilePhoto && <img src={user.profilePhoto} alt={user.name} className="w-full h-full object-cover" />}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-semibold text-white">{user.name}</p>
+                                                        <p className="text-cyan-400">Rating: {user.averageRating.toFixed(1)} ({user.totalRatings} reviews)</p>
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
                                 {users.map((user, index) => (
                                     <motion.div
